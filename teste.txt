@@ -1,0 +1,29 @@
+import boto3
+import threading
+
+s3 = boto3.client('s3')
+bucket_name = 'my-bucket'
+
+def download_file(obj):
+    s3.download_file(bucket_name, obj['Key'], obj['Key'])
+
+# create a list of threads
+threads = []
+
+# specify the prefix of the folder
+folder_prefix = 'folder/'
+
+# get the objects of the folder 
+objects = s3.list_objects_v2(Bucket=bucket_name, Prefix=folder_prefix)['Contents']
+
+#start download files using threading
+for obj in objects:
+    t = threading.Thread(target=download_file, args=(obj,))
+    t.start()
+    threads.append(t)
+
+# Wait for all threads to complete
+for t in threads:
+    t.join()
+
+print("All files downloaded!")
