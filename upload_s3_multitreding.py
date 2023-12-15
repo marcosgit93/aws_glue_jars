@@ -1,39 +1,32 @@
 import os
-import concurrent.futures
 import boto3
+import concurrent.futures
 
-# Configurações do AWS S3
-BUCKET_NAME = 'seu-bucket'
-AWS_ACCESS_KEY_ID = 'seu-access-key'
-AWS_SECRET_ACCESS_KEY = 'seu-secret-key'
-REGION_NAME = 'sua-regiao-do-bucket'
+# Configuração do cliente S3
+s3 = boto3.client('s3',
+                  aws_access_key_id='SEU_ACCESS_KEY_ID',
+                  aws_secret_access_key='SEU_SECRET_ACCESS_KEY')
 
-# Função para realizar o upload de uma pasta para o AWS S3
-def upload_folder(folder_path, s3_client, bucket_name):
-    for root, dirs, files in os.walk(folder_path):
+# Função para fazer upload de um diretório para o S3
+def upload_directory(local_path, bucket_name, s3_path):
+    for root, dirs, files in os.walk(local_path):
         for file in files:
-            local_path = os.path.join(root, file)
-            s3_path = os.path.relpath(local_path, folder_path)
-            s3_client.upload_file(local_path, bucket_name, s3_path)
-            print(f'Uploaded {local_path} to S3 bucket')
+            local_file_path = os.path.join(root, file)
+            s3_file_path = os.path.join(s3_path, os.path.relpath(local_file_path, local_path))
+            print(f'Uploading {local_file_path} to {s3_file_path}')
+            s3.upload_file(local_file_path, bucket_name, s3_file_path)
 
 if __name__ == "__main__":
-    s3 = boto3.client('s3', aws_access_key_id=AWS_ACCESS_KEY_ID,
-                      aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                      region_name=REGION_NAME)
+    # Diretório local a ser carregado
+    local_directory = "C:/Windows/teste"
+    
+    # Bucket S3 e caminho no bucket
+    bucket_name = "pessoa"
+    s3_path = "plano/cadadro/"
 
-    folder_path = 'C:/windows/teste'  # Caminho da pasta local a ser carregada para o S3
+    # Listar diretórios no local_directory
+    directories = [os.path.join(local_directory, name) for name in os.listdir(local_directory) if os.path.isdir(os.path.join(local_directory, name))]
 
+    # Use ThreadPoolExecutor para executar o upload em múltiplos threads
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = []
-        for root, dirs, files in os.walk(folder_path):
-            for dir_name in dirs:
-                full_path = os.path.join(root, dir_name)
-                futures.append(executor.submit(upload_folder, full_path, s3, BUCKET_NAME))
-
-        # Espera todas as threads terminarem
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f'Exception: {e}')
+        executor.map(upload_directory, directories, [bucket_name]*len(directories), [s3_path]*len(directories))
